@@ -1,0 +1,45 @@
+[workspace]
+resolver = "2"
+members = ["crates/engine", "crates/capture", "crates/cli", "app/src-tauri"]
+default-members = ["crates/engine", "crates/capture", "crates/cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/Julestblt/airloop"
+
+[workspace.dependencies]
+# AirPlay 2 protocol stack. Pinned to our fork of lmcgartland/airplay2-rs
+# (GPL-3.0-or-later), which adds Windows portability and optional FDK-AAC.
+airplay-core = { git = "https://github.com/Julestblt/airplay2-rs", rev = "ad6ea936502e55334f44add62b131d2731a52260" }
+airplay-discovery = { git = "https://github.com/Julestblt/airplay2-rs", rev = "ad6ea936502e55334f44add62b131d2731a52260" }
+airplay-audio = { git = "https://github.com/Julestblt/airplay2-rs", rev = "ad6ea936502e55334f44add62b131d2731a52260", default-features = false }
+airplay-client = { git = "https://github.com/Julestblt/airplay2-rs", rev = "ad6ea936502e55334f44add62b131d2731a52260", default-features = false }
+
+tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tokio-stream = "0.1"
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+crossbeam-channel = "0.5"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

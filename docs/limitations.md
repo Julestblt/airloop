@@ -1,0 +1,33 @@
+# Known limitations
+
+- **Windows capture not yet validated on real hardware.** The WASAPI code
+  compiles and passes CI on `windows-latest` (which has no audio device), but
+  nobody has yet streamed real Windows audio through it. The protocol side was
+  verified separately, from Linux, with a generated test tone.
+- **Latency is about 2 seconds.** Realtime AirPlay buffers on the receiver.
+  Not suitable for games, video calls or lip-synced video.
+- **PC speakers keep playing** during whole-PC capture. Loopback capture taps
+  what Windows sends to the output device, so that device still plays it.
+- **Browser-tab capture is not available.** Windows can only isolate audio per
+  process. Chrome/Edge/Firefox play all tabs through one audio process, so
+  "One app" captures the whole browser. Per-tab capture would need a browser
+  extension (`chrome.tabCapture`) plus native messaging. Out of scope for now.
+- **One-app capture needs Windows 11** (or Windows 10 build 20348+), which
+  added process loopback. On older Windows the option is disabled.
+- **Protected audio**: content that Windows marks as protected may be silenced
+  in loopback capture by the OS.
+- **Several independent speakers**: implemented (shared NTP clock, SETPEERS),
+  but only verified with a single stereo pair. Sync quality between
+  independent speakers is unmeasured.
+- **Password/PIN-protected receivers** (Apple TV with "Require password",
+  speakers with access limited to Home members) are not supported. The UI marks
+  them as unsupported.
+- **Session drops**: on one test day the HomePod closed every third-party
+  session after ~10 s (see architecture notes). The engine reconnects
+  automatically (up to 6 tries), which would be audible as gaps.
+- **If someone else AirPlays to the speaker** (an iPhone, say), the HomePod
+  ends our session. With auto-reconnect on, Airloop retries and may take the
+  speaker back. Turn auto-reconnect off in Settings if that's a problem.
+- **Unsigned builds**: SmartScreen warns on first run.
+- **No macOS/Linux app**: the engine is portable, but capture and packaging are
+  Windows-only today.
