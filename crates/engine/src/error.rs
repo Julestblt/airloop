@@ -61,7 +61,7 @@ impl EngineError {
     pub fn user_message(&self) -> String {
         match self.kind() {
             ErrorKind::Unreachable => {
-                "The speaker didn't respond. Check that it's powered on and on the same network as this PC.".into()
+                "The speaker didn't answer in time. It may still be finishing a previous session: wait a few seconds and try again. If it keeps happening, check that it's on the same network as this PC and that Windows Firewall allows Airloop (network set to Private).".into()
             }
             ErrorKind::AccessDenied => "The speaker refused the connection. In the Home app, set \"Allow Speaker & TV Access\" to \"Everyone\" or \"Anyone on the Same Network\".".into(),
             ErrorKind::TimingPortsBusy => "Another app is using the AirPlay clock ports (UDP 319/320). Close other AirPlay or PTP software and try again.".into(),
@@ -81,7 +81,7 @@ fn classify(e: &airplay_core::error::Error) -> ErrorKind {
             }
             _ => ErrorKind::Unreachable,
         },
-        Error::Rtsp(RtspError::ConnectionRefused) => ErrorKind::Unreachable,
+        Error::Rtsp(RtspError::ConnectionRefused) | Error::Timeout => ErrorKind::Unreachable,
         Error::Rtsp(RtspError::UnexpectedStatus(401 | 403 | 470)) => ErrorKind::AccessDenied,
         Error::Pairing(_) => ErrorKind::AccessDenied,
         _ => {
@@ -121,6 +121,11 @@ mod tests {
             connect(Error::Connection(io)).kind(),
             ErrorKind::Unreachable
         );
+    }
+
+    #[test]
+    fn rtsp_timeout_is_unreachable() {
+        assert_eq!(connect(Error::Timeout).kind(), ErrorKind::Unreachable);
     }
 
     #[test]

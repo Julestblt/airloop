@@ -168,7 +168,7 @@ fn open_log_dir(state: State<'_, AppState>) -> CmdResult<()> {
 fn init_logging(log_dir: &PathBuf) -> Option<tracing_appender::non_blocking::WorkerGuard> {
     use tracing_subscriber::prelude::*;
     let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        "info,airplay_audio=warn,airplay_client=warn,airplay_timing=warn,airplay_rtsp=warn,mdns_sd=warn".into()
+        "info,airplay_audio=warn,airplay_client=info,airplay_timing=info,airplay_rtsp=info,mdns_sd=warn".into()
     });
     let file = tracing_appender::rolling::Builder::new()
         .rotation(tracing_appender::rolling::Rotation::DAILY)

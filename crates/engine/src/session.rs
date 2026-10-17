@@ -129,8 +129,10 @@ impl StreamSession {
             "starting AirPlay session"
         );
 
+        let started = std::time::Instant::now();
         let mut members = Vec::with_capacity(targets.len());
         for target in targets {
+            info!(speaker = %target.speaker.name, address = ?target.speaker.address, "step: connect and pair");
             let mut conn = connect(&target, config.clone()).await?;
             conn.set_initial_volume(gain);
             members.push(Member { target, conn });
@@ -140,6 +142,10 @@ impl StreamSession {
             members,
             feedback_failures: 0,
         };
+        info!(
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "step: RTSP setup"
+        );
         if let Err(e) = session.setup_all().await {
             session.stop().await;
             return Err(e);
@@ -162,6 +168,10 @@ impl StreamSession {
                 "superseded by a newer connection".into(),
             ));
         }
+        info!(
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "step: start audio"
+        );
         for (m, decoder) in session.members.iter_mut().zip(decoders) {
             let name = m.target.speaker.name.clone();
             if let Err(source) = m.conn.start_streaming_live(decoder).await {
@@ -173,7 +183,10 @@ impl StreamSession {
                 });
             }
         }
-        info!("AirPlay session streaming");
+        info!(
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "AirPlay session streaming"
+        );
         Ok(session)
     }
 

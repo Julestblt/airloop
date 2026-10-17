@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "airloop"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "airloop-capture",
  "airloop-engine",
@@ -72,7 +72,7 @@ dependencies = [
 
 [[package]]
 name = "airloop-capture"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "airloop-engine",
  "rubato 0.16.2",
@@ -84,7 +84,7 @@ dependencies = [
 
 [[package]]
 name = "airloop-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "airloop-capture",
  "airloop-engine",
@@ -97,7 +97,7 @@ dependencies = [
 
 [[package]]
 name = "airloop-engine"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "airplay-audio",
  "airplay-client",

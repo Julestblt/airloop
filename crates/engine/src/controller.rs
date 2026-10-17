@@ -22,6 +22,10 @@ use tracing::{error, info, warn};
 
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(2);
 const MAX_RECONNECT_ATTEMPTS: u32 = 6;
+/// Extra tries for a first connection that got no answer. HomePods sometimes
+/// ignore requests for a few seconds after a session ended abruptly.
+const INITIAL_CONNECT_RETRIES: u32 = 2;
+const INITIAL_RETRY_DELAY: Duration = Duration::from_secs(3);
 
 /// Connection state shown in the UI.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -151,6 +155,7 @@ impl Engine {
             generation: 0,
             reconnect_at: None,
             attempt: 0,
+            initial_retries: 0,
         };
         tokio::spawn(actor.run());
         Ok(Engine {
@@ -228,6 +233,8 @@ struct Actor {
     generation: u64,
     reconnect_at: Option<tokio::time::Instant>,
     attempt: u32,
+    /// Retries used for the current first connection.
+    initial_retries: u32,
 }
 
 impl Actor {
@@ -272,6 +279,7 @@ impl Actor {
             } => {
                 self.teardown(true).await;
                 self.attempt = 0;
+                self.initial_retries = 0;
                 let description = source.describe();
                 if let Err(e) = source.start(self.sink.clone()) {
                     let e = EngineError::from(e);
@@ -418,6 +426,17 @@ impl Actor {
             e.kind(),
             ErrorKind::Unreachable | ErrorKind::Protocol | ErrorKind::SpeakerGone
         );
+        if self.attempt == 0
+            && e.kind() == ErrorKind::Unreachable
+            && self.initial_retries < INITIAL_CONNECT_RETRIES
+        {
+            // First connection got no answer: retry quietly, still "connecting".
+            self.initial_retries += 1;
+            info!(retry = self.initial_retries, error = %e, "no answer, retrying first connection");
+            self.reconnect_at = Some(tokio::time::Instant::now() + INITIAL_RETRY_DELAY);
+            self.update(|s| s.state = EngineState::Connecting);
+            return;
+        }
         if auto && retryable && self.attempt > 0 && self.attempt < MAX_RECONNECT_ATTEMPTS {
             self.attempt += 1;
             self.schedule_reconnect(Duration::from_secs(2u64.pow(self.attempt.min(5))), e);
