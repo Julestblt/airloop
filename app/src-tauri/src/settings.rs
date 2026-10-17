@@ -111,10 +111,12 @@ mod tests {
     fn round_trip_and_sanitize() {
         let path = temp_path("rt");
         let store = SettingsStore::load(path.clone());
-        let mut s = Settings::default();
-        s.volume = 250;
-        s.source_kind = "bogus".into();
-        s.last_speaker_ids = vec!["pair-x".into()];
+        let s = Settings {
+            volume: 250,
+            source_kind: "bogus".into(),
+            last_speaker_ids: vec!["pair-x".into()],
+            ..Settings::default()
+        };
         store.set(s).expect("save");
         let loaded = SettingsStore::load(path.clone()).get();
         assert_eq!(loaded.volume, 100);
