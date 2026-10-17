@@ -35,7 +35,10 @@ jobs:
           New-Item -ItemType Directory dist-release | Out-Null
           Copy-Item target/release/bundle/nsis/*.exe "dist-release/Airloop_${v}_x64-setup.exe"
           Compress-Archive -Path target/release/airloop.exe, target/release/airloop-cli.exe, LICENSE -DestinationPath "dist-release/Airloop_${v}_x64-portable.zip"
-          Get-ChildItem dist-release | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } | Out-File -Encoding ascii dist-release/SHA256SUMS.txt
+          # Hash first, write after: piping into a file inside the folder
+          # being enumerated makes Get-FileHash read the open output file.
+          $sums = Get-ChildItem dist-release -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name }
+          $sums | Out-File -Encoding ascii dist-release/SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           files: dist-release/*
