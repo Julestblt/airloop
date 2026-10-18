@@ -1,52 +1,46 @@
-// The app window is a frameless, transparent, always-on-top strip pinned to
-// the top centre of the screen. It is sized to the island it contains, plus
-// some transparent margin so the island's drop shadow is not clipped.
-// Outside Tauri (browser dev server, tests) every function is a no-op.
+// Bridge to the native island controller (app/src-tauri/src/island.rs).
+//
+// The window has a fixed size and is hidden until the mouse touches the top
+// centre of the screen; the native side shows it and emits `island:reveal`,
+// later `island:dismiss` when the mouse has left. The UI animates in and out
+// and reports the island's bounds so the rest of the window lets clicks
+// through. Outside Tauri (browser dev server, tests) these are no-ops and the
+// island is simply always visible.
 
-export const MARGIN = { top: 8, side: 28, bottom: 34 } as const;
+export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
-const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-
-/** Resizes the window around an island of `width` × `height` CSS px and keeps
- * it centred at the top of the monitor it is on. */
-export async function fitWindow(width: number, height: number): Promise<void> {
+async function invoke(cmd: string, args?: Record<string, unknown>): Promise<void> {
   if (!inTauri) return;
-  const { getCurrentWindow, currentMonitor } = await import("@tauri-apps/api/window");
-  const { LogicalPosition, LogicalSize } = await import("@tauri-apps/api/dpi");
-  const win = getCurrentWindow();
-  const w = Math.ceil(width + MARGIN.side * 2);
-  const h = Math.ceil(height + MARGIN.top + MARGIN.bottom);
-  await win.setSize(new LogicalSize(w, h));
-  const monitor = await currentMonitor();
-  if (monitor) {
-    const scale = monitor.scaleFactor;
-    const x = monitor.position.x / scale + (monitor.size.width / scale - w) / 2;
-    const y = monitor.position.y / scale;
-    await win.setPosition(new LogicalPosition(Math.round(x), Math.round(y)));
-  }
+  const core = await import("@tauri-apps/api/core");
+  await core.invoke(cmd, args);
 }
 
-/** Shows and focuses the window (it starts hidden until first sized). */
-export async function showWindow(): Promise<void> {
-  if (!inTauri) return;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  const win = getCurrentWindow();
-  await win.show();
-  await win.setFocus();
+/** Island bounds in CSS px relative to the window. */
+export function reportRect(r: DOMRect): Promise<void> {
+  return invoke("island_rect", { x: r.x, y: r.y, w: r.width, h: r.height });
 }
 
-/** Calls `cb` whenever the window loses focus. Returns an unsubscribe. */
-export async function onWindowBlur(cb: () => void): Promise<() => void> {
-  if (!inTauri) return () => {};
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  return getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-    if (!focused) cb();
-  });
+/** Keeps the island up while the user drags something (e.g. the volume). */
+export function pin(pinned: boolean): Promise<void> {
+  return invoke("island_pin", { pinned });
 }
 
-/** Calls `cb` when the tray asks the island to open. */
-export async function onExpandRequest(cb: () => void): Promise<() => void> {
+/** Shows the island for `ms` even if the mouse is elsewhere. */
+export function reveal(ms: number): Promise<void> {
+  return invoke("island_reveal", { ms });
+}
+
+/** Tells the native side the exit animation finished; it hides the window. */
+export function hidden(): Promise<void> {
+  return invoke("island_hidden");
+}
+
+async function on(event: string, cb: () => void): Promise<() => void> {
   if (!inTauri) return () => {};
   const { listen } = await import("@tauri-apps/api/event");
-  return listen("island:expand", () => cb());
+  return listen(event, () => cb());
 }
+
+export const onReveal = (cb: () => void) => on("island:reveal", cb);
+export const onDismiss = (cb: () => void) => on("island:dismiss", cb);
+export const onExpandRequest = (cb: () => void) => on("island:expand", cb);

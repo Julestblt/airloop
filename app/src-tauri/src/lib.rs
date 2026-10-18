@@ -2,6 +2,7 @@
 //! around the platform-independent `airloop-engine`.
 
 mod firewall;
+mod island;
 mod settings;
 
 use airloop_capture::{
@@ -166,6 +167,26 @@ async fn fix_firewall() -> CmdResult<()> {
 }
 
 #[tauri::command]
+fn island_rect(ctl: State<'_, island::IslandControl>, x: f64, y: f64, w: f64, h: f64) {
+    ctl.set_rect(x, y, w, h);
+}
+
+#[tauri::command]
+fn island_pin(ctl: State<'_, island::IslandControl>, pinned: bool) {
+    ctl.set_pinned(pinned);
+}
+
+#[tauri::command]
+fn island_reveal(ctl: State<'_, island::IslandControl>, ms: u64) {
+    ctl.reveal_for(ms.min(30_000));
+}
+
+#[tauri::command]
+fn island_hidden(ctl: State<'_, island::IslandControl>, window: tauri::WebviewWindow) {
+    ctl.hidden(&window);
+}
+
+#[tauri::command]
 fn quit_app(app: AppHandle) {
     quit(&app);
 }
@@ -218,19 +239,10 @@ fn init_logging(log_dir: &PathBuf) -> Option<tracing_appender::non_blocking::Wor
     guard
 }
 
-/// Shows the island and asks the UI to open its panel.
+/// Reveals the island for a while and asks the UI to open its panel.
 fn show_main(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("main") {
-        let _ = w.show();
-        let _ = w.set_focus();
-    }
+    app.state::<island::IslandControl>().reveal_for(6_000);
     let _ = app.emit("island:expand", ());
-}
-
-fn hide_main(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("main") {
-        let _ = w.hide();
-    }
 }
 
 fn tray_label(status: &EngineStatus) -> &'static str {
@@ -298,10 +310,9 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         true,
         None::<&str>,
     )?;
-    let hide = MenuItem::with_id(app, "hide", "Hide island", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&show, &toggle, &hide, &sep, &quit_item])?;
+    let menu = Menu::with_items(app, &[&show, &toggle, &sep, &quit_item])?;
     let tray = TrayIconBuilder::with_id("main")
         .icon(
             app.default_window_icon()
@@ -313,7 +324,6 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main(app),
-            "hide" => hide_main(app),
             "toggle" => tray_toggle(app),
             "quit" => quit(app),
             _ => {}
@@ -398,8 +408,10 @@ pub fn run() {
                     Box::<dyn std::error::Error>::from(e.to_string())
                 })?;
             app.manage(AppState { engine, settings, log_dir, _log_guard: Mutex::new(guard) });
+            app.manage(island::IslandControl::default());
             forward_events(&handle);
             setup_tray(&handle)?;
+            island::start(&handle);
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -426,6 +438,10 @@ pub fn run() {
             open_log_dir,
             fix_firewall,
             quit_app,
+            island_rect,
+            island_pin,
+            island_reveal,
+            island_hidden,
         ]);
 
     if let Err(e) = builder.run(tauri::generate_context!()) {
