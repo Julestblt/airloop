@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "airloop"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "airloop-capture",
  "airloop-engine",
@@ -68,11 +68,12 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "windows",
 ]
 
 [[package]]
 name = "airloop-capture"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "airloop-engine",
  "rubato 0.16.2",
@@ -84,7 +85,7 @@ dependencies = [
 
 [[package]]
 name = "airloop-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "airloop-capture",
  "airloop-engine",
@@ -97,7 +98,7 @@ dependencies = [
 
 [[package]]
 name = "airloop-engine"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "airplay-audio",
  "airplay-client",
@@ -115,7 +116,7 @@ dependencies = [
 [[package]]
 name = "airplay-audio"
 version = "0.1.0"
-source = "git+https://github.com/Julestblt/airplay2-rs?rev=ad6ea936502e55334f44add62b131d2731a52260#ad6ea936502e55334f44add62b131d2731a52260"
+source = "git+https://github.com/Julestblt/airplay2-rs?rev=08d7f82519a6c513e12bcf0ffe209f478c0cb7de#08d7f82519a6c513e12bcf0ffe209f478c0cb7de"
 dependencies = [
  "airplay-core",
  "airplay-crypto",
@@ -139,7 +140,7 @@ dependencies = [
 [[package]]
 name = "airplay-client"
 version = "0.1.0"
-source = "git+https://github.com/Julestblt/airplay2-rs?rev=ad6ea936502e55334f44add62b131d2731a52260#ad6ea936502e55334f44add62b131d2731a52260"
+source = "git+https://github.com/Julestblt/airplay2-rs?rev=08d7f82519a6c513e12bcf0ffe209f478c0cb7de#08d7f82519a6c513e12bcf0ffe209f478c0cb7de"
 dependencies = [
  "airplay-audio",
  "airplay-core",
@@ -162,7 +163,7 @@ dependencies = [
 [[package]]
 name = "airplay-core"
 version = "0.1.0"
-source = "git+https://github.com/Julestblt/airplay2-rs?rev=ad6ea936502e55334f44add62b131d2731a52260#ad6ea936502e55334f44add62b131d2731a52260"
+source = "git+https://github.com/Julestblt/airplay2-rs?rev=08d7f82519a6c513e12bcf0ffe209f478c0cb7de#08d7f82519a6c513e12bcf0ffe209f478c0cb7de"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
@@ -172,7 +173,7 @@ dependencies = [
 [[package]]
 name = "airplay-crypto"
 version = "0.1.0"
-source = "git+https://github.com/Julestblt/airplay2-rs?rev=ad6ea936502e55334f44add62b131d2731a52260#ad6ea936502e55334f44add62b131d2731a52260"
+source = "git+https://github.com/Julestblt/airplay2-rs?rev=08d7f82519a6c513e12bcf0ffe209f478c0cb7de#08d7f82519a6c513e12bcf0ffe209f478c0cb7de"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -198,7 +199,7 @@ dependencies = [
 [[package]]
 name = "airplay-discovery"
 version = "0.1.0"
-source = "git+https://github.com/Julestblt/airplay2-rs?rev=ad6ea936502e55334f44add62b131d2731a52260#ad6ea936502e55334f44add62b131d2731a52260"
+source = "git+https://github.com/Julestblt/airplay2-rs?rev=08d7f82519a6c513e12bcf0ffe209f478c0cb7de#08d7f82519a6c513e12bcf0ffe209f478c0cb7de"
 dependencies = [
  "airplay-core",
  "async-stream",
@@ -214,7 +215,7 @@ dependencies = [
 [[package]]
 name = "airplay-pairing"
 version = "0.1.0"
-source = "git+https://github.com/Julestblt/airplay2-rs?rev=ad6ea936502e55334f44add62b131d2731a52260#ad6ea936502e55334f44add62b131d2731a52260"
+source = "git+https://github.com/Julestblt/airplay2-rs?rev=08d7f82519a6c513e12bcf0ffe209f478c0cb7de#08d7f82519a6c513e12bcf0ffe209f478c0cb7de"
 dependencies = [
  "airplay-core",
  "airplay-crypto",
@@ -228,7 +229,7 @@ dependencies = [
 [[package]]
 name = "airplay-resampler"
 version = "0.1.0"
-source = "git+https://github.com/Julestblt/airplay2-rs?rev=ad6ea936502e55334f44add62b131d2731a52260#ad6ea936502e55334f44add62b131d2731a52260"
+source = "git+https://github.com/Julestblt/airplay2-rs?rev=08d7f82519a6c513e12bcf0ffe209f478c0cb7de#08d7f82519a6c513e12bcf0ffe209f478c0cb7de"
 dependencies = [
  "airplay-core",
  "fastrand",
@@ -239,7 +240,7 @@ dependencies = [
 [[package]]
 name = "airplay-rtsp"
 version = "0.1.0"
-source = "git+https://github.com/Julestblt/airplay2-rs?rev=ad6ea936502e55334f44add62b131d2731a52260#ad6ea936502e55334f44add62b131d2731a52260"
+source = "git+https://github.com/Julestblt/airplay2-rs?rev=08d7f82519a6c513e12bcf0ffe209f478c0cb7de#08d7f82519a6c513e12bcf0ffe209f478c0cb7de"
 dependencies = [
  "airplay-core",
  "airplay-crypto",
@@ -259,7 +260,7 @@ dependencies = [
 [[package]]
 name = "airplay-timing"
 version = "0.1.0"
-source = "git+https://github.com/Julestblt/airplay2-rs?rev=ad6ea936502e55334f44add62b131d2731a52260#ad6ea936502e55334f44add62b131d2731a52260"
+source = "git+https://github.com/Julestblt/airplay2-rs?rev=08d7f82519a6c513e12bcf0ffe209f478c0cb7de#08d7f82519a6c513e12bcf0ffe209f478c0cb7de"
 dependencies = [
  "airplay-core",
  "async-trait",

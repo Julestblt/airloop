@@ -34,8 +34,9 @@ Download `Airloop_x.y.z_x64-setup.exe` from the
 [Releases](https://github.com/Julestblt/airloop/releases) page and run it.
 
 - The installer asks for administrator rights to add one Windows Firewall
-  rule (inbound UDP for Airloop only, private/domain networks). AirPlay
-  speakers send timing and retransmit requests back to the sender.
+  rule (inbound traffic for Airloop only). AirPlay speakers send timing and
+  retransmit requests back to the sender; without the rule the connection
+  stalls. If it is ever missing, the app offers **Allow in firewall**.
 - The build is **not code-signed**: SmartScreen shows "Windows protected your
   PC" → *More info* → *Run anyway*. Compare the file with `SHA256SUMS.txt`.
 - Requires Windows 10 or 11 (x64) with the Edge WebView2 runtime (preinstalled

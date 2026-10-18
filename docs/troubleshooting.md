@@ -13,14 +13,19 @@ Include the latest `airloop.*.log` when reporting a problem; logs contain no key
   choose **Everyone** or **Anyone on the Same Network**, and turn off
   *Require Password*.
 
+**"Windows Firewall is blocking the speaker…" / stuck on Connecting**
+- The HomePod must send timing requests back to the PC (inbound UDP). If
+  Windows Firewall blocks them, setup stalls and Airloop reports it.
+- Click **Allow in firewall** in the error banner and accept the Windows
+  administrator prompt. It removes any block rule for Airloop (created if the
+  first-run "Allow access?" prompt was cancelled) and adds an allow rule.
+- Or by hand, in an administrator PowerShell:
+  `New-NetFirewallRule -DisplayName Airloop -Direction Inbound -Program "C:\Program Files\Airloop\airloop.exe" -Action Allow -Profile Any`
+
 **Connects, but no sound**
 - Check the Airloop volume slider (it is the HomePod's volume) and the level
   meter: if the meter is flat, nothing is being captured. Play something on
   the PC, or choose the right app under *One app*.
-- Windows Firewall must allow Airloop on private networks (the installer adds
-  the rule; the portable zip does not — accept the firewall prompt, or add an
-  inbound rule for `airloop.exe`).
-- Make sure the network profile is *Private*, not *Public*.
 
 **Sound cuts out every few seconds / reconnects**
 - Weak Wi-Fi on the PC or the HomePod. Wired Ethernet for the PC helps.

@@ -25,6 +25,7 @@ export type ErrorKind =
   | "unreachable"
   | "accessDenied"
   | "timingPortsBusy"
+  | "firewallBlocked"
   | "protocol"
   | "speakerGone"
   | "capture"

@@ -12,6 +12,9 @@ pub enum ErrorKind {
     AccessDenied,
     /// Another program holds the PTP clock ports (UDP 319/320).
     TimingPortsBusy,
+    /// The speaker never reached this PC (inbound UDP blocked, usually by
+    /// Windows Firewall or a Public network profile).
+    FirewallBlocked,
     /// The speaker answered but the AirPlay session could not be set up.
     Protocol,
     /// The selected speaker is no longer on the network.
@@ -38,6 +41,8 @@ pub enum EngineError {
     Capture(#[from] crate::source::SourceError),
     #[error("timed out after {0:?} while {1}")]
     Timeout(std::time::Duration, &'static str),
+    #[error("{speaker} could not reach this PC: no timing requests arrived (inbound UDP blocked)")]
+    InboundBlocked { speaker: String },
     #[error("mDNS discovery: {0}")]
     Discovery(String),
     #[error("{0}")]
@@ -52,6 +57,7 @@ impl EngineError {
             EngineError::Unsupported(_) => ErrorKind::Protocol,
             EngineError::Capture(_) => ErrorKind::Capture,
             EngineError::Timeout(..) => ErrorKind::Unreachable,
+            EngineError::InboundBlocked { .. } => ErrorKind::FirewallBlocked,
             EngineError::Discovery(_) | EngineError::Other(_) => ErrorKind::Internal,
             EngineError::Connect { source, .. } => classify(source),
         }
@@ -64,6 +70,7 @@ impl EngineError {
                 "The speaker didn't answer in time. It may still be finishing a previous session: wait a few seconds and try again. If it keeps happening, check that it's on the same network as this PC and that Windows Firewall allows Airloop (network set to Private).".into()
             }
             ErrorKind::AccessDenied => "The speaker refused the connection. In the Home app, set \"Allow Speaker & TV Access\" to \"Everyone\" or \"Anyone on the Same Network\".".into(),
+            ErrorKind::FirewallBlocked => "Windows Firewall is blocking the speaker from talking back to this PC. Click \"Allow in firewall\" below, or set your network to Private in Windows settings.".into(),
             ErrorKind::TimingPortsBusy => "Another app is using the AirPlay clock ports (UDP 319/320). Close other AirPlay or PTP software and try again.".into(),
             ErrorKind::SpeakerGone => "The speaker is no longer on the network.".into(),
             ErrorKind::Capture => format!("Couldn't capture audio: {self}"),
@@ -126,6 +133,15 @@ mod tests {
     #[test]
     fn rtsp_timeout_is_unreachable() {
         assert_eq!(connect(Error::Timeout).kind(), ErrorKind::Unreachable);
+    }
+
+    #[test]
+    fn inbound_blocked_is_firewall() {
+        let e = EngineError::InboundBlocked {
+            speaker: "x".into(),
+        };
+        assert_eq!(e.kind(), ErrorKind::FirewallBlocked);
+        assert!(e.user_message().contains("Firewall"));
     }
 
     #[test]

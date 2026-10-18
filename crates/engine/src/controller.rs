@@ -422,6 +422,11 @@ impl Actor {
     /// session that used to work, otherwise report the error.
     fn on_session_lost(&mut self, e: &EngineError) {
         let auto = self.status.borrow().auto_reconnect;
+        if e.kind() == ErrorKind::FirewallBlocked {
+            // Retrying cannot help until the user changes the firewall.
+            self.fail(e);
+            return;
+        }
         let retryable = matches!(
             e.kind(),
             ErrorKind::Unreachable | ErrorKind::Protocol | ErrorKind::SpeakerGone

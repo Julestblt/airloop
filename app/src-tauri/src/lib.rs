@@ -1,6 +1,7 @@
 //! Airloop desktop shell: Tauri commands, tray icon, settings and logging
 //! around the platform-independent `airloop-engine`.
 
+mod firewall;
 mod settings;
 
 use airloop_capture::{
@@ -153,6 +154,15 @@ async fn resume(state: State<'_, AppState>) -> CmdResult<()> {
 async fn set_auto_reconnect(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
     state.engine.set_auto_reconnect(enabled).await;
     Ok(())
+}
+
+#[tauri::command]
+async fn fix_firewall() -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(firewall::allow_airloop)
+        .await
+        .map_err(|e| e.to_string())?
+        .inspect(|()| info!("firewall rule updated"))
+        .inspect_err(|e| warn!(error = %e, "firewall update failed"))
 }
 
 #[tauri::command]
@@ -406,6 +416,7 @@ pub fn run() {
             set_auto_reconnect,
             get_level,
             open_log_dir,
+            fix_firewall,
         ]);
 
     if let Err(e) = builder.run(tauri::generate_context!()) {

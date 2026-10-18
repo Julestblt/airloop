@@ -17,5 +17,5 @@ cleanup() { docker kill "$name" >/dev/null 2>&1 || true; }
 trap cleanup EXIT INT TERM
 echo "log: $log" >&2
 docker run --rm --name "$name" --network host \
-  -e AIRLOOP_TIMING -e RUST_LOG="${RUST_LOG:-info,airplay_audio=warn,airplay_client=warn,airplay_timing=warn}" \
+  -e AIRLOOP_TIMING -e AIRPLAY_NTP_DROP_REQUESTS -e RUST_LOG="${RUST_LOG:-info,airplay_audio=warn,airplay_client=warn,airplay_timing=warn}" \
   -v "$(dirname "$bin"):/w:ro" debian:trixie-slim /w/airloop-cli "$@" 2>&1 | tee "$log"

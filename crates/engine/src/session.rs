@@ -147,6 +147,29 @@ impl StreamSession {
             "step: RTSP setup"
         );
         if let Err(e) = session.setup_all().await {
+            // With NTP timing the receiver must query our timing server
+            // before it answers SETUP. If it timed out and not a single
+            // timing request arrived, inbound UDP is being blocked.
+            let blocked = session
+                .members
+                .iter()
+                .find(|m| m.conn.ntp_requests_received() == Some(0));
+            let e = match (&e, blocked) {
+                (
+                    EngineError::Connect {
+                        source: airplay_core::Error::Timeout,
+                        ..
+                    },
+                    Some(m),
+                )
+                | (EngineError::Timeout(..), Some(m)) => {
+                    warn!(speaker = %m.target.speaker.name, "no NTP timing requests received; inbound UDP looks blocked");
+                    EngineError::InboundBlocked {
+                        speaker: m.target.speaker.name.clone(),
+                    }
+                }
+                _ => e,
+            };
             session.stop().await;
             return Err(e);
         }

@@ -4,6 +4,7 @@ import {
   Play,
   Power,
   Settings2,
+  ShieldCheck,
   Volume1,
   Volume2,
   VolumeX,
@@ -71,6 +72,14 @@ export default function App() {
     let cancelled = false;
     (async () => {
       const a = await api();
+      // Subscribe before reading snapshots: the backend only emits on change,
+      // so anything that changes in between would otherwise be lost.
+      const subs = [await a.onSpeakers(setSpeakers), await a.onStatus(setStatus)];
+      if (cancelled) {
+        subs.forEach((f) => f());
+        return;
+      }
+      cleanup = subs;
       const [i, sp, st, se] = await Promise.all([
         a.appInfo(),
         a.speakers(),
@@ -79,19 +88,29 @@ export default function App() {
       ]);
       if (cancelled) return;
       setInfo(i);
-      setSpeakers(sp);
+      setSpeakers((cur) => (cur.length > 0 ? cur : sp));
       setStatus(st);
       setSettings(se);
       setSelected(isActive(st) ? st.speakerIds : se.lastSpeakerIds);
       setVolumeState(se.volume);
       setLoaded(true);
-      cleanup = [await a.onSpeakers(setSpeakers), await a.onStatus(setStatus)];
     })();
     return () => {
       cancelled = true;
       cleanup.forEach((f) => f());
     };
   }, []);
+
+  // Safety net: while no speaker is known, re-read the list every 2 s.
+  const noSpeakers = speakers.length === 0;
+  useEffect(() => {
+    if (!noSpeakers) return;
+    const id = setInterval(async () => {
+      const list = await (await api()).speakers();
+      if (list.length > 0) setSpeakers(list);
+    }, 2000);
+    return () => clearInterval(id);
+  }, [noSpeakers]);
 
   const refreshApps = useCallback(async () => {
     try {
@@ -161,6 +180,21 @@ export default function App() {
     await a.connect(availableSelected, source);
   };
 
+  const [fixing, setFixing] = useState(false);
+  const [fixError, setFixError] = useState<string | null>(null);
+  const fixFirewall = async () => {
+    setFixing(true);
+    setFixError(null);
+    try {
+      await (await api()).fixFirewall();
+      await connect();
+    } catch (e) {
+      setFixError(String(e));
+    } finally {
+      setFixing(false);
+    }
+  };
+
   const primary = async () => {
     const a = await api();
     if (active) await a.disconnect();
@@ -208,7 +242,16 @@ export default function App() {
             className="flex gap-3 rounded-[var(--radius-card)] border border-danger/30 bg-danger/10 p-3 text-sm"
           >
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
-            <p>{status.error.message}</p>
+            <div className="flex-1 space-y-2">
+              <p>{status.error.message}</p>
+              {status.error.kind === "firewallBlocked" && (
+                <Button variant="secondary" disabled={fixing} onClick={() => void fixFirewall()}>
+                  <ShieldCheck className="h-4 w-4" />
+                  {fixing ? "Waiting for Windows…" : "Allow in firewall"}
+                </Button>
+              )}
+              {fixError && <p className="text-xs text-danger">{fixError}</p>}
+            </div>
           </div>
         )}
 
