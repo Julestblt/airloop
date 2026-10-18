@@ -47,15 +47,18 @@ A portable `.zip` (no installer, no firewall rule) is also published.
 ## Using it
 
 Airloop lives in a black **island** at the top of the screen, inspired by the
-iPhone's Dynamic Island:
+iPhone's Dynamic Island. It stays **hidden** until you want it:
 
-- **Pill** (collapsed): shows the speaker and live level bars while playing.
-  Click it to open the panel. Clicking anywhere else folds it back.
-- **Panel** (expanded): choose **Whole PC** or an app, pick one or more
-  speakers (a Home-app stereo pair is one entry), set the volume, press
-  **Play**. While playing: **Pause** / **Disconnect**.
-- The tray icon reopens the island, reconnects to the last speakers, hides the
-  island or quits.
+- **Reveal**: push the mouse against the top edge of the screen, in the middle,
+  for a moment. The island drops down as a **pill** (speaker, live level bars).
+- **Open**: rest the mouse on the pill (or click it) to open the **panel**:
+  choose **Whole PC** or an app, pick one or more speakers (a Home-app stereo
+  pair is one entry), set the volume, press **Play**. While playing:
+  **Pause** / **Disconnect**.
+- **Leave**: move the mouse away and it folds back up and disappears. It also
+  pops down for a few seconds by itself when playback starts or fails.
+- It never takes keyboard focus, and the space around it lets clicks through.
+- The tray icon opens the island, reconnects to the last speakers, or quits.
 
 Notes:
 

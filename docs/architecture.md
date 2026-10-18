@@ -84,11 +84,23 @@ volume slider maps linearly to AirPlay's −30…0 dB range, as Apple senders do
 
 ## UI: the island
 
-The window is frameless, transparent, always on top and skipped from the
-taskbar. `app/src/lib/island.ts` sizes it to the island (plus a transparent
-margin for the shadow) through a `ResizeObserver` and keeps it centred at the
-top of the current monitor. It starts hidden and is shown after the first
-sizing, so it never flashes at the wrong size. Losing focus folds the panel
-into the pill. Icons are MingCute (Apache-2.0) compiled per icon by
-`unplugin-icons`; the Geist fonts are bundled (`@fontsource-variable`), so the
-UI makes no network requests.
+The window is frameless, transparent, always on top, not focusable and
+skipped from the taskbar, with a **fixed size** (600×580); it is never resized
+while animating, which is what made 0.2.0 stutter. `app/src-tauri/src/island.rs`
+runs a watcher thread (30 ms ticks) on the global cursor position:
+
+- hidden, cursor resting ≥150 ms on the top-centre hot zone (±170 px, top
+  2 px) → place the window on that monitor, show it, emit `island:reveal`;
+- shown → the UI reports the island's bounds (`island_rect`); outside them the
+  window ignores the mouse (`set_ignore_cursor_events`), so it never blocks
+  clicks;
+- cursor away for 450 ms (and not pinned during a drag, not in a timed
+  reveal) → emit `island:dismiss`; the UI animates out and calls
+  `island_hidden`; the watcher hides the window itself if the UI doesn't
+  answer within 1.5 s.
+
+Animations use Motion: one spring for the pill ↔ panel morph (`layout`), the
+content cross-fades with `layout="position"` so text is never stretched, and
+the island drops in/out from the top edge. Icons are MingCute (Apache-2.0)
+compiled per icon by `unplugin-icons`; the Geist fonts are bundled, so the UI
+makes no network requests.

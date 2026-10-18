@@ -1,7 +1,17 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Panel, Pill, SettingsView, cn } from "./components/Island";
 import { api, idleStatus } from "./lib/api";
-import { fitWindow, onExpandRequest, onWindowBlur, showWindow } from "./lib/island";
+import { AnimatePresence, motion, type Transition } from "motion/react";
+import {
+  hidden,
+  inTauri,
+  onDismiss,
+  onExpandRequest,
+  onReveal,
+  pin,
+  reportRect,
+  reveal,
+} from "./lib/island";
 import type { AppInfo, AudioApp, EngineStatus, Settings, Speaker } from "./lib/types";
 
 const defaultSettings: Settings = {
@@ -21,6 +31,11 @@ export function isActive(status: EngineStatus): boolean {
 
 type View = "pill" | "panel" | "settings";
 
+/** One spring for every morph, so pill → panel and back feel like one object. */
+const spring: Transition = { type: "spring", stiffness: 520, damping: 42, mass: 0.9 };
+/** Hovering the pill this long opens the panel. */
+const HOVER_EXPAND_MS = 260;
+
 export default function App() {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
@@ -30,7 +45,10 @@ export default function App() {
   const [apps, setApps] = useState<AudioApp[]>([]);
   const [volume, setVolumeState] = useState(25);
   const [level, setLevel] = useState(0);
-  const [view, setView] = useState<View>("panel");
+  // In the app the island starts hidden and appears as a pill; in a plain
+  // browser (dev, tests) it is always visible and opens on the panel.
+  const [view, setView] = useState<View>(inTauri ? "pill" : "panel");
+  const [visible, setVisible] = useState(!inTauri);
   const [fixing, setFixing] = useState(false);
   const [fixError, setFixError] = useState<string | null>(null);
 
@@ -46,6 +64,8 @@ export default function App() {
         await a.onSpeakers(setSpeakers),
         await a.onStatus(setStatus),
         await onExpandRequest(() => setView("panel")),
+        await onReveal(() => setVisible(true)),
+        await onDismiss(() => setVisible(false)),
       ];
       if (cancelled) {
         subs.forEach((f) => f());
@@ -72,12 +92,15 @@ export default function App() {
     };
   }, []);
 
-  // Dynamic-island behaviour: clicking anywhere else folds it back to a pill.
+  // Pop the pill down briefly when something happens the user should see.
+  const kind = status.state.kind;
+  const prevKind = useRef(kind);
   useEffect(() => {
-    let off = () => {};
-    void onWindowBlur(() => setView("pill")).then((f) => (off = f));
-    return () => off();
-  }, []);
+    if (prevKind.current !== kind && ["streaming", "error", "reconnecting"].includes(kind)) {
+      void reveal(3500);
+    }
+    prevKind.current = kind;
+  }, [kind]);
 
   // Safety net: while no speaker is known, re-read the list every 2 s.
   const noSpeakers = speakers.length === 0;
@@ -121,25 +144,39 @@ export default function App() {
   }, [streaming]);
   const shownLevel = streaming ? level : 0;
 
-  // Size the window to the island and keep it pinned to the top centre.
+  // Report the island's bounds so the native side knows where the mouse
+  // counts as "on the island" (everything else in the window is click-through).
   const islandRef = useRef<HTMLDivElement>(null);
-  const shown = useRef(false);
-  useLayoutEffect(() => {
+  const sendRect = useCallback(() => {
+    const el = islandRef.current;
+    if (el) void reportRect(el.getBoundingClientRect());
+  }, []);
+  useEffect(() => {
     const el = islandRef.current;
     if (!el) return;
-    const fit = () => {
-      const r = el.getBoundingClientRect();
-      void fitWindow(r.width, r.height).then(() => {
-        if (!shown.current) {
-          shown.current = true;
-          void showWindow();
-        }
-      });
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
+    sendRect();
+    const ro = new ResizeObserver(sendRect);
     ro.observe(el);
     return () => ro.disconnect();
+  }, [visible, sendRect]);
+
+  // Hover the pill a moment to open it, like the Dynamic Island.
+  const dwell = useRef<number | null>(null);
+  const cancelDwell = () => {
+    if (dwell.current) window.clearTimeout(dwell.current);
+    dwell.current = null;
+  };
+  const startDwell = () => {
+    if (view !== "pill") return;
+    cancelDwell();
+    dwell.current = window.setTimeout(() => setView("panel"), HOVER_EXPAND_MS);
+  };
+
+  // Keep the island up while a drag (volume slider) is in progress.
+  useEffect(() => {
+    const release = () => void pin(false);
+    window.addEventListener("pointerup", release);
+    return () => window.removeEventListener("pointerup", release);
   }, []);
 
   const persist = useCallback(async (next: Settings) => {
@@ -217,72 +254,112 @@ export default function App() {
     }
   })();
 
+  const content = (
+    <>
+      {view === "pill" && (
+        <Pill
+          status={status}
+          speakers={speakers}
+          level={shownLevel}
+          onExpand={() => setView("panel")}
+        />
+      )}
+      {view === "panel" && (
+        <Panel
+          info={info}
+          status={status}
+          speakers={speakers}
+          selected={selected}
+          onToggleSpeaker={toggleSpeaker}
+          settings={settings}
+          apps={apps}
+          onPickSystem={() => void persist({ ...settings, sourceKind: "system" })}
+          onPickApp={(a) => void persist({ ...settings, sourceKind: "app", lastAppExe: a.exe })}
+          onRefreshApps={() => void refreshApps()}
+          volume={volume}
+          onVolume={onVolume}
+          level={shownLevel}
+          primaryLabel={primaryLabel}
+          canConnect={canConnect}
+          onPrimary={() => void primary()}
+          onPauseResume={async () => {
+            const a = await api();
+            if (status.state.kind === "paused") await a.resume();
+            else await a.pause();
+          }}
+          onCollapse={() => setView("pill")}
+          onOpenSettings={() => setView("settings")}
+          fixing={fixing}
+          fixError={fixError}
+          onFixFirewall={() => void fixFirewall()}
+        />
+      )}
+      {view === "settings" && (
+        <SettingsView
+          info={info}
+          status={status}
+          settings={settings}
+          onChange={async (s) => {
+            await persist(s);
+            if (s.autoReconnect !== settings.autoReconnect) {
+              await (await api()).setAutoReconnect(s.autoReconnect);
+            }
+          }}
+          onBack={() => setView("panel")}
+          onOpenLogs={async () => (await api()).openLogDir()}
+          onQuit={async () => (await api()).quit()}
+        />
+      )}
+    </>
+  );
+
   return (
-    <div className="flex justify-center" style={{ padding: "8px 28px 34px" }}>
-      <div
-        ref={islandRef}
-        className={cn(
-          "island bg-island text-fg shadow-island",
-          view === "pill"
-            ? "w-[280px] rounded-full"
-            : "w-[540px] rounded-[34px] px-5 pt-[18px] pb-5",
-        )}
+    <div className="flex justify-center pt-2">
+      <AnimatePresence
+        onExitComplete={() => {
+          setView("pill");
+          void hidden();
+        }}
       >
-        {view === "pill" && (
-          <Pill
-            status={status}
-            speakers={speakers}
-            level={shownLevel}
-            onExpand={() => setView("panel")}
-          />
-        )}
-        {view === "panel" && (
-          <Panel
-            info={info}
-            status={status}
-            speakers={speakers}
-            selected={selected}
-            onToggleSpeaker={toggleSpeaker}
-            settings={settings}
-            apps={apps}
-            onPickSystem={() => void persist({ ...settings, sourceKind: "system" })}
-            onPickApp={(a) => void persist({ ...settings, sourceKind: "app", lastAppExe: a.exe })}
-            onRefreshApps={() => void refreshApps()}
-            volume={volume}
-            onVolume={onVolume}
-            level={shownLevel}
-            primaryLabel={primaryLabel}
-            canConnect={canConnect}
-            onPrimary={() => void primary()}
-            onPauseResume={async () => {
-              const a = await api();
-              if (status.state.kind === "paused") await a.resume();
-              else await a.pause();
+        {visible && (
+          <motion.div
+            key="island"
+            ref={islandRef}
+            layout
+            initial={{ y: -64, opacity: 0, scale: 0.9 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{
+              y: -64,
+              opacity: 0,
+              scale: 0.9,
+              transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
             }}
-            onCollapse={() => setView("pill")}
-            onOpenSettings={() => setView("settings")}
-            fixing={fixing}
-            fixError={fixError}
-            onFixFirewall={() => void fixFirewall()}
-          />
+            transition={spring}
+            onLayoutAnimationComplete={sendRect}
+            onPointerEnter={startDwell}
+            onPointerLeave={cancelDwell}
+            onPointerDownCapture={() => void pin(true)}
+            style={{ borderRadius: view === "pill" ? 20 : 34 }}
+            className={cn(
+              "overflow-hidden bg-island text-fg shadow-island",
+              view === "pill" ? "w-[280px]" : "w-[540px] px-5 pt-[18px] pb-5",
+            )}
+          >
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.div
+                key={view}
+                layout="position"
+                initial={{ opacity: 0, filter: "blur(4px)" }}
+                animate={{ opacity: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, filter: "blur(4px)" }}
+                transition={{ duration: 0.16 }}
+              >
+                {content}
+              </motion.div>
+            </AnimatePresence>
+          </motion.div>
         )}
-        {view === "settings" && (
-          <SettingsView
-            info={info}
-            status={status}
-            settings={settings}
-            onChange={async (s) => {
-              await persist(s);
-              if (s.autoReconnect !== settings.autoReconnect) {
-                await (await api()).setAutoReconnect(s.autoReconnect);
-              }
-            }}
-            onBack={() => setView("panel")}
-            onOpenLogs={async () => (await api()).openLogDir()}
-            onQuit={async () => (await api()).quit()}
-          />
-        )}
-      </div>
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,17 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Island window: IPC, events, and the window calls it needs to size, place, show and hide itself",
+  "description": "Island window: IPC and events only; the native side sizes, places, shows and hides it",
   "windows": [
     "main"
   ],
   "permissions": [
-    "core:default",
-    "core:window:allow-set-size",
-    "core:window:allow-set-position",
-    "core:window:allow-show",
-    "core:window:allow-hide",
-    "core:window:allow-set-focus",
-    "core:window:allow-current-monitor"
+    "core:default"
   ]
 }
