@@ -1,11 +1,14 @@
 # Known limitations
 
-- **Windows capture not yet validated on real hardware.** The WASAPI code
-  compiles and passes CI on `windows-latest` (which has no audio device), but
-  nobody has yet streamed real Windows audio through it. The protocol side was
-  verified separately, from Linux, with a generated test tone.
-- **Latency is about 2 seconds.** Realtime AirPlay buffers on the receiver.
-  Not suitable for games, video calls or lip-synced video.
+- **Windows capture: partly validated.** Capturing one app (Brave) to a
+  HomePod mini stereo pair was confirmed working on a real Windows PC with
+  0.1.2. Whole-PC capture runs the same pipeline but has not been confirmed by
+  a user yet.
+- **Latency is about 2 seconds.** Realtime AirPlay buffers on the receiver
+  (~2 s). Airloop itself adds ~0.2 s since 0.2.2 (it used to add ~1 s). An
+  experimental *Low latency* setting asks the speaker for a shorter buffer;
+  whether a given speaker honours it can only be judged by ear. Video players
+  that can shift audio (VLC: J/K keys) can compensate; browsers cannot.
 - **PC speakers keep playing** during whole-PC capture. Loopback capture taps
   what Windows sends to the output device, so that device still plays it.
 - **Browser-tab capture is not available.** Windows can only isolate audio per

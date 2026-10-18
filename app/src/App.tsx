@@ -20,6 +20,7 @@ const defaultSettings: Settings = {
   lastAppExe: null,
   volume: 25,
   autoReconnect: true,
+  lowLatency: false,
   closeToTray: true,
 };
 
@@ -301,8 +302,12 @@ export default function App() {
           settings={settings}
           onChange={async (s) => {
             await persist(s);
+            const a = await api();
             if (s.autoReconnect !== settings.autoReconnect) {
-              await (await api()).setAutoReconnect(s.autoReconnect);
+              await a.setAutoReconnect(s.autoReconnect);
+            }
+            if (s.lowLatency !== settings.lowLatency) {
+              await a.setLowLatency(s.lowLatency);
             }
           }}
           onBack={() => setView("panel")}

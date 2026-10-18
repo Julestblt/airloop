@@ -19,6 +19,7 @@ export interface Api {
   pause(): Promise<void>;
   resume(): Promise<void>;
   setAutoReconnect(enabled: boolean): Promise<void>;
+  setLowLatency(enabled: boolean): Promise<void>;
   level(): Promise<number>;
   openLogDir(): Promise<void>;
   fixFirewall(): Promise<void>;
@@ -45,6 +46,7 @@ async function tauriApi(): Promise<Api> {
     pause: () => invoke("pause"),
     resume: () => invoke("resume"),
     setAutoReconnect: (enabled) => invoke("set_auto_reconnect", { enabled }),
+    setLowLatency: (enabled) => invoke("set_low_latency", { enabled }),
     level: () => invoke("get_level"),
     openLogDir: () => invoke("open_log_dir"),
     fixFirewall: () => invoke("fix_firewall"),
@@ -61,6 +63,7 @@ export const idleStatus: EngineStatus = {
   source: null,
   error: null,
   autoReconnect: true,
+  lowLatency: false,
   diagnostics: { bufferMs: 0, driftPpm: 0, bufferUnderruns: 0, droppedChunks: 0, speakers: [] },
 };
 
@@ -94,6 +97,7 @@ export function mockApi(): Api {
     lastAppExe: null,
     volume: 25,
     autoReconnect: true,
+    lowLatency: false,
     closeToTray: true,
   };
   const statusListeners = new Set<(s: EngineStatus) => void>();
@@ -135,6 +139,7 @@ export function mockApi(): Api {
     pause: async () => emit({ state: { kind: "paused" } }),
     resume: async () => emit({ state: { kind: "streaming" } }),
     setAutoReconnect: async (autoReconnect) => emit({ autoReconnect }),
+    setLowLatency: async (lowLatency) => emit({ lowLatency }),
     level: async () => (status.state.kind === "streaming" ? Math.random() * 0.6 : 0),
     openLogDir: async () => {},
     fixFirewall: async () => {},

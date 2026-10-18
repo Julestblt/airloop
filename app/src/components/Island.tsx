@@ -560,6 +560,12 @@ export function SettingsView({
         checked={settings.autoReconnect}
         onChange={(v) => onChange({ ...settings, autoReconnect: v })}
       />
+      <Toggle
+        label="Low latency (experimental)"
+        hint="Asks speakers for a shorter buffer. Applies on the next connection."
+        checked={settings.lowLatency}
+        onChange={(v) => onChange({ ...settings, lowLatency: v })}
+      />
       <dl className="grid grid-cols-3 gap-2">
         {rows.map(([k, v]) => (
           <div key={k} className="rounded-2xl bg-raised px-3 py-2">

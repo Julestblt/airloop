@@ -23,6 +23,10 @@ use tracing::{info, warn};
 const TRANSIENT_PIN: &str = "3939";
 /// Queue between the clock thread and each AirPlay streamer, in 10 ms chunks.
 const LIVE_QUEUE_CHUNKS: usize = 64;
+/// Audio the AirPlay streamer accumulates before its first packet. Our clock
+/// bridge already delivers a steady stream, so a small cushion is enough;
+/// the library's 1000 ms default added a second of latency for nothing.
+const LIVE_PREBUFFER_MS: u32 = 150;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const SETUP_TIMEOUT: Duration = Duration::from_secs(20);
 
@@ -47,7 +51,19 @@ pub struct StreamSession {
     feedback_failures: u32,
 }
 
-fn stream_config(timing: TimingProtocol) -> Result<StreamConfig, EngineError> {
+/// Receiver latency bounds sent in SETUP, in frames at 44.1 kHz.
+/// Normal: 0.5–2 s (what most senders use). Low: 0.1–0.5 s, experimental:
+/// whether a receiver honours it can only be judged by ear.
+fn latency_bounds(low_latency: bool) -> (u32, u32) {
+    if low_latency {
+        (4_410, 22_050)
+    } else {
+        (22_050, 88_200)
+    }
+}
+
+fn stream_config(timing: TimingProtocol, low_latency: bool) -> Result<StreamConfig, EngineError> {
+    let (latency_min, latency_max) = latency_bounds(low_latency);
     let audio_format = AudioFormat::default();
     debug_assert_eq!(audio_format.codec, AudioCodec::Alac);
     let cookie = AlacEncoder::new(audio_format)
@@ -58,8 +74,8 @@ fn stream_config(timing: TimingProtocol) -> Result<StreamConfig, EngineError> {
         audio_format,
         timing_protocol: timing,
         ptp_mode: PtpMode::Master,
-        latency_min: 22_050,
-        latency_max: 88_200,
+        latency_min,
+        latency_max,
         supports_dynamic_stream_id: true,
         asc: Some(cookie),
     })
@@ -100,6 +116,25 @@ impl StreamSession {
         volume_percent: u8,
         sink: &crate::FrameSink,
         generation: u64,
+        low_latency: bool,
+    ) -> Result<StreamSession, EngineError> {
+        if low_latency {
+            match Self::start_with(targets.clone(), volume_percent, sink, generation, true).await {
+                Err(e) if e.kind() == crate::ErrorKind::Protocol => {
+                    warn!(error = %e, "low-latency setup refused, retrying with normal latency");
+                }
+                other => return other,
+            }
+        }
+        Self::start_with(targets, volume_percent, sink, generation, false).await
+    }
+
+    async fn start_with(
+        targets: Vec<Target>,
+        volume_percent: u8,
+        sink: &crate::FrameSink,
+        generation: u64,
+        low_latency: bool,
     ) -> Result<StreamSession, EngineError> {
         let Some(first) = targets.first() else {
             return Err(EngineError::Other("no speakers selected".into()));
@@ -120,12 +155,13 @@ impl StreamSession {
             Ok("ptp") => TimingProtocol::Ptp,
             _ => TimingProtocol::Ntp,
         };
-        let config = stream_config(timing)?;
+        let config = stream_config(timing, low_latency)?;
         let gain = volume::percent_to_client_gain(volume_percent);
         info!(
             speakers = targets.len(),
             first = %first.speaker.name,
             ?timing,
+            low_latency,
             "starting AirPlay session"
         );
 
@@ -135,6 +171,7 @@ impl StreamSession {
             info!(speaker = %target.speaker.name, address = ?target.speaker.address, "step: connect and pair");
             let mut conn = connect(&target, config.clone()).await?;
             conn.set_initial_volume(gain);
+            conn.set_live_prebuffer_ms(LIVE_PREBUFFER_MS);
             members.push(Member { target, conn });
         }
 
@@ -369,5 +406,20 @@ impl StreamSession {
             }
         }
         info!("AirPlay session stopped");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn low_latency_asks_for_a_shorter_buffer() {
+        let (lo_min, lo_max) = latency_bounds(true);
+        let (n_min, n_max) = latency_bounds(false);
+        assert!(lo_min < n_min && lo_max < n_max);
+        assert!(lo_min < lo_max);
+        let c = stream_config(TimingProtocol::Ntp, true).expect("config");
+        assert_eq!((c.latency_min, c.latency_max), (4_410, 22_050));
     }
 }

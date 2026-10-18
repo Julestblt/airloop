@@ -21,6 +21,7 @@ struct Args {
     seconds: u64,
     freq: f32,
     pid: Option<u32>,
+    low_latency: bool,
 }
 
 fn parse() -> Result<Args> {
@@ -33,6 +34,7 @@ fn parse() -> Result<Args> {
         seconds: 10,
         freq: 440.0,
         pid: None,
+        low_latency: false,
     };
     while let Some(arg) = it.next() {
         let mut value = |name: &str| it.next().with_context(|| format!("{name} needs a value"));
@@ -41,6 +43,7 @@ fn parse() -> Result<Args> {
             "--seconds" => a.seconds = value("--seconds")?.parse()?,
             "--freq" => a.freq = value("--freq")?.parse()?,
             "--pid" => a.pid = Some(value("--pid")?.parse()?),
+            "--low-latency" => a.low_latency = true,
             s if s.starts_with("--") => bail!("unknown option {s}"),
             s => a.speakers.push(s.to_string()),
         }
@@ -72,7 +75,7 @@ async fn stream(args: &Args, source: Box<dyn AudioSource>) -> Result<()> {
     if args.speakers.is_empty() {
         bail!("name at least one speaker");
     }
-    let engine = Engine::start(args.volume, false).await?;
+    let engine = Engine::start(args.volume, false, args.low_latency).await?;
     // Give mDNS time to see every member of a stereo pair, not just the
     // first advertisement.
     tokio::time::sleep(Duration::from_secs(4)).await;
@@ -160,7 +163,7 @@ async fn main() -> Result<()> {
 async fn run(args: &Args) -> Result<()> {
     match args.command.as_str() {
         "scan" => {
-            let engine = Engine::start(0, false).await?;
+            let engine = Engine::start(0, false, false).await?;
             tokio::time::sleep(Duration::from_secs(args.seconds.min(30))).await;
             for s in engine.current_speakers() {
                 println!("{}", serde_json::to_string(&s)?);
@@ -185,7 +188,9 @@ async fn run(args: &Args) -> Result<()> {
         }
         _ => {
             eprintln!("usage: airloop-cli scan | tone <speaker>... | capture <speaker>... [--pid PID] | sources");
-            eprintln!("options: --volume 0-100 (default 25)  --seconds N  --freq HZ");
+            eprintln!(
+                "options: --volume 0-100 (default 25)  --seconds N  --freq HZ  --low-latency"
+            );
         }
     }
     Ok(())

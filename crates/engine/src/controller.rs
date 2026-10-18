@@ -99,6 +99,8 @@ pub struct EngineStatus {
     pub source: Option<String>,
     pub error: Option<UiError>,
     pub auto_reconnect: bool,
+    /// Ask speakers for a shorter buffer (applies to the next connection).
+    pub low_latency: bool,
     pub diagnostics: Diagnostics,
 }
 
@@ -112,6 +114,7 @@ enum Command {
     Pause,
     Resume,
     SetAutoReconnect(bool),
+    SetLowLatency(bool),
     SessionResult {
         generation: u64,
         result: Result<StreamSession, EngineError>,
@@ -129,7 +132,11 @@ pub struct Engine {
 
 impl Engine {
     /// Starts discovery and the engine task. Must run inside Tokio.
-    pub async fn start(volume: u8, auto_reconnect: bool) -> Result<Engine, EngineError> {
+    pub async fn start(
+        volume: u8,
+        auto_reconnect: bool,
+        low_latency: bool,
+    ) -> Result<Engine, EngineError> {
         let discovery = Arc::new(SpeakerDiscovery::start().await?);
         let (sink, clock) = FrameSink::new();
         let (tx, rx) = mpsc::channel(32);
@@ -140,6 +147,7 @@ impl Engine {
             source: None,
             error: None,
             auto_reconnect,
+            low_latency,
             diagnostics: Diagnostics::default(),
         };
         let (status_tx, status) = watch::channel(initial);
@@ -213,6 +221,10 @@ impl Engine {
 
     pub async fn resume(&self) {
         self.send(Command::Resume).await;
+    }
+
+    pub async fn set_low_latency(&self, enabled: bool) {
+        self.send(Command::SetLowLatency(enabled)).await;
     }
 
     pub async fn set_auto_reconnect(&self, enabled: bool) {
@@ -336,6 +348,9 @@ impl Actor {
             Command::SetAutoReconnect(enabled) => {
                 self.update(|s| s.auto_reconnect = enabled);
             }
+            Command::SetLowLatency(enabled) => {
+                self.update(|s| s.low_latency = enabled);
+            }
             Command::SessionResult { generation, result } => {
                 self.on_session_result(generation, result).await;
             }
@@ -344,9 +359,9 @@ impl Actor {
 
     /// Resolves the selected speakers and starts connecting in the background.
     fn begin_session(&mut self) {
-        let (ids, volume) = {
+        let (ids, volume, low_latency) = {
             let s = self.status.borrow();
-            (s.speaker_ids.clone(), s.volume)
+            (s.speaker_ids.clone(), s.volume, s.low_latency)
         };
         let mut targets = Vec::new();
         for id in &ids {
@@ -374,7 +389,8 @@ impl Actor {
         let tx = self.tx.clone();
         let sink = self.sink.clone();
         tokio::spawn(async move {
-            let result = StreamSession::start(targets, volume, &sink, generation).await;
+            let result =
+                StreamSession::start(targets, volume, &sink, generation, low_latency).await;
             if let Err(Command::SessionResult {
                 result: Ok(session),
                 ..

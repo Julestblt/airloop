@@ -58,6 +58,7 @@ export interface EngineStatus {
   source: string | null;
   error: UiError | null;
   autoReconnect: boolean;
+  lowLatency: boolean;
   diagnostics: Diagnostics;
 }
 
@@ -76,6 +77,7 @@ export interface Settings {
   lastAppExe: string | null;
   volume: number;
   autoReconnect: boolean;
+  lowLatency: boolean;
   closeToTray: boolean;
 }
 

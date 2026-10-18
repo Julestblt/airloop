@@ -18,6 +18,8 @@ pub struct Settings {
     pub last_app_exe: Option<String>,
     pub volume: u8,
     pub auto_reconnect: bool,
+    /// Experimental: ask speakers for a shorter buffer.
+    pub low_latency: bool,
     /// Unused since the island UI (0.2); kept so older settings files load.
     pub close_to_tray: bool,
 }
@@ -30,6 +32,7 @@ impl Default for Settings {
             last_app_exe: None,
             volume: airloop_engine::volume::DEFAULT_PERCENT,
             auto_reconnect: true,
+            low_latency: false,
             close_to_tray: true,
         }
     }
