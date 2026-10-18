@@ -18,6 +18,7 @@ pub struct Settings {
     pub last_app_exe: Option<String>,
     pub volume: u8,
     pub auto_reconnect: bool,
+    /// Unused since the island UI (0.2); kept so older settings files load.
     pub close_to_tray: bool,
 }
 

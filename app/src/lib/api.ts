@@ -22,6 +22,7 @@ export interface Api {
   level(): Promise<number>;
   openLogDir(): Promise<void>;
   fixFirewall(): Promise<void>;
+  quit(): Promise<void>;
   onSpeakers(cb: (s: Speaker[]) => void): Promise<Unlisten>;
   onStatus(cb: (s: EngineStatus) => void): Promise<Unlisten>;
 }
@@ -47,6 +48,7 @@ async function tauriApi(): Promise<Api> {
     level: () => invoke("get_level"),
     openLogDir: () => invoke("open_log_dir"),
     fixFirewall: () => invoke("fix_firewall"),
+    quit: () => invoke("quit_app"),
     onSpeakers: (cb) => listen<Speaker[]>("speakers", (e) => cb(e.payload)),
     onStatus: (cb) => listen<EngineStatus>("status", (e) => cb(e.payload)),
   };
@@ -136,6 +138,7 @@ export function mockApi(): Api {
     level: async () => (status.state.kind === "streaming" ? Math.random() * 0.6 : 0),
     openLogDir: async () => {},
     fixFirewall: async () => {},
+    quit: async () => {},
     onSpeakers: async () => () => {},
     onStatus: async (cb) => {
       statusListeners.add(cb);

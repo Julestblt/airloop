@@ -16,7 +16,7 @@
 | `crates/capture` | WASAPI system/process loopback, audio app list | Windows (stubs elsewhere) |
 | `crates/cli` | Headless sender for protocol tests (`tone`, `capture`, `scan`) | any |
 | `app/src-tauri` | Tauri commands, tray, settings, logging, installer | Windows (primary) |
-| `app/src` | React + TypeScript + Tailwind UI | — |
+| `app/src` | React + TypeScript + Tailwind UI (the island) | — |
 
 ## Key decisions
 
@@ -81,3 +81,14 @@ volume slider maps linearly to AirPlay's −30…0 dB range, as Apple senders do
   pairing is added, keys must go to Windows Credential Manager.
 - Logs never contain keys; pairing material stays inside airplay2-rs.
 - The UI has no network access (strict CSP); only Tauri IPC.
+
+## UI: the island
+
+The window is frameless, transparent, always on top and skipped from the
+taskbar. `app/src/lib/island.ts` sizes it to the island (plus a transparent
+margin for the shadow) through a `ResizeObserver` and keeps it centred at the
+top of the current monitor. It starts hidden and is shown after the first
+sizing, so it never flashes at the wrong size. Losing focus folds the panel
+into the pill. Icons are MingCute (Apache-2.0) compiled per icon by
+`unplugin-icons`; the Geist fonts are bundled (`@fontsource-variable`), so the
+UI makes no network requests.

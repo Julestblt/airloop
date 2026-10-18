@@ -1,21 +1,7 @@
-import {
-  AlertCircle,
-  Pause,
-  Play,
-  Power,
-  Settings2,
-  ShieldCheck,
-  Volume1,
-  Volume2,
-  VolumeX,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SettingsPanel } from "./components/SettingsPanel";
-import { SourcePicker } from "./components/SourcePicker";
-import { SpeakerList } from "./components/SpeakerList";
-import { StatusPill } from "./components/StatusPill";
-import { Button, SectionTitle, Slider, cn } from "./components/ui";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Panel, Pill, SettingsView, cn } from "./components/Island";
 import { api, idleStatus } from "./lib/api";
+import { fitWindow, onExpandRequest, onWindowBlur, showWindow } from "./lib/island";
 import type { AppInfo, AudioApp, EngineStatus, Settings, Speaker } from "./lib/types";
 
 const defaultSettings: Settings = {
@@ -33,24 +19,7 @@ export function isActive(status: EngineStatus): boolean {
   return k === "connecting" || k === "streaming" || k === "paused" || k === "reconnecting";
 }
 
-function LevelMeter({ level }: { level: number }) {
-  const bars = 12;
-  const lit = Math.round(Math.min(1, Math.sqrt(level)) * bars);
-  return (
-    <div className="flex h-3 items-end gap-0.5" aria-hidden>
-      {Array.from({ length: bars }, (_, i) => (
-        <span
-          key={i}
-          className={cn(
-            "w-1 rounded-sm transition-colors duration-75",
-            i < lit ? (i > bars - 3 ? "bg-warn" : "bg-ok") : "bg-border",
-          )}
-          style={{ height: `${30 + (i / bars) * 70}%` }}
-        />
-      ))}
-    </div>
-  );
-}
+type View = "pill" | "panel" | "settings";
 
 export default function App() {
   const [info, setInfo] = useState<AppInfo | null>(null);
@@ -61,20 +30,23 @@ export default function App() {
   const [apps, setApps] = useState<AudioApp[]>([]);
   const [volume, setVolumeState] = useState(25);
   const [level, setLevel] = useState(0);
-  const [showSettings, setShowSettings] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [view, setView] = useState<View>("panel");
+  const [fixing, setFixing] = useState(false);
+  const [fixError, setFixError] = useState<string | null>(null);
 
   const active = isActive(status);
 
-  // Initial load + subscriptions.
+  // Initial load + subscriptions (subscribe first: the backend only emits on change).
   useEffect(() => {
     let cleanup: (() => void)[] = [];
     let cancelled = false;
     (async () => {
       const a = await api();
-      // Subscribe before reading snapshots: the backend only emits on change,
-      // so anything that changes in between would otherwise be lost.
-      const subs = [await a.onSpeakers(setSpeakers), await a.onStatus(setStatus)];
+      const subs = [
+        await a.onSpeakers(setSpeakers),
+        await a.onStatus(setStatus),
+        await onExpandRequest(() => setView("panel")),
+      ];
       if (cancelled) {
         subs.forEach((f) => f());
         return;
@@ -93,12 +65,18 @@ export default function App() {
       setSettings(se);
       setSelected(isActive(st) ? st.speakerIds : se.lastSpeakerIds);
       setVolumeState(se.volume);
-      setLoaded(true);
     })();
     return () => {
       cancelled = true;
       cleanup.forEach((f) => f());
     };
+  }, []);
+
+  // Dynamic-island behaviour: clicking anywhere else folds it back to a pill.
+  useEffect(() => {
+    let off = () => {};
+    void onWindowBlur(() => setView("pill")).then((f) => (off = f));
+    return () => off();
   }, []);
 
   // Safety net: while no speaker is known, re-read the list every 2 s.
@@ -120,8 +98,10 @@ export default function App() {
     }
   }, []);
 
+  // Load the app list whenever the panel opens.
+  const panelOpen = view === "panel";
   useEffect(() => {
-    if (settings.sourceKind !== "app") return;
+    if (!panelOpen) return;
     let cancelled = false;
     api()
       .then((a) => a.listApps())
@@ -130,9 +110,9 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [settings.sourceKind]);
+  }, [panelOpen]);
 
-  // Level meter polling while audio flows.
+  // Live level for the bars.
   const streaming = status.state.kind === "streaming";
   useEffect(() => {
     if (!streaming) return;
@@ -140,6 +120,27 @@ export default function App() {
     return () => clearInterval(id);
   }, [streaming]);
   const shownLevel = streaming ? level : 0;
+
+  // Size the window to the island and keep it pinned to the top centre.
+  const islandRef = useRef<HTMLDivElement>(null);
+  const shown = useRef(false);
+  useLayoutEffect(() => {
+    const el = islandRef.current;
+    if (!el) return;
+    const fit = () => {
+      const r = el.getBoundingClientRect();
+      void fitWindow(r.width, r.height).then(() => {
+        if (!shown.current) {
+          shown.current = true;
+          void showWindow();
+        }
+      });
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const persist = useCallback(async (next: Settings) => {
     setSettings(next);
@@ -166,22 +167,20 @@ export default function App() {
   };
 
   const availableSelected = selected.filter((id) => speakers.some((s) => s.id === id));
-  const needsApp = settings.sourceKind === "app" && !selectedApp;
+  const needsApp = settings.sourceKind === "app" && !settings.lastAppExe;
   const canConnect = availableSelected.length > 0 && !needsApp;
 
   const connect = async () => {
     const a = await api();
     const source =
-      settings.sourceKind === "app" && selectedApp
-        ? { kind: "app" as const, pid: selectedApp.pid, exe: selectedApp.exe }
+      settings.sourceKind === "app" && settings.lastAppExe
+        ? { kind: "app" as const, pid: selectedApp?.pid ?? 0, exe: settings.lastAppExe }
         : { kind: "system" as const };
     await a.setVolume(volume);
     await persist({ ...settings, lastSpeakerIds: availableSelected, volume });
     await a.connect(availableSelected, source);
   };
 
-  const [fixing, setFixing] = useState(false);
-  const [fixError, setFixError] = useState<string | null>(null);
   const fixFirewall = async () => {
     setFixing(true);
     setFixError(null);
@@ -210,134 +209,80 @@ export default function App() {
       case "reconnecting":
         return "Disconnect";
       default:
-        if (availableSelected.length === 0) return "Select a speaker";
+        if (availableSelected.length === 0) return "Choose a speaker";
         if (needsApp) return "Choose an app";
         return availableSelected.length > 1
           ? `Play on ${availableSelected.length} speakers`
-          : "Connect";
+          : "Play";
     }
   })();
 
-  const VolumeIcon = volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
-
   return (
-    <div className="relative flex h-full flex-col">
-      <header className="flex items-center justify-between px-5 pt-5 pb-3">
-        <div className="flex items-center gap-2.5">
-          <img src="/logo.svg" alt="" className="h-7 w-7" />
-          <h1 className="text-lg font-semibold tracking-tight">Airloop</h1>
-        </div>
-        <div className="flex items-center gap-1">
-          <StatusPill state={status.state} />
-          <Button variant="ghost" onClick={() => setShowSettings(true)} aria-label="Settings">
-            <Settings2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </header>
-
-      <main className="flex-1 space-y-5 overflow-y-auto px-5 pb-4">
-        {status.error && status.state.kind !== "streaming" && (
-          <div
-            role="alert"
-            className="flex gap-3 rounded-[var(--radius-card)] border border-danger/30 bg-danger/10 p-3 text-sm"
-          >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
-            <div className="flex-1 space-y-2">
-              <p>{status.error.message}</p>
-              {status.error.kind === "firewallBlocked" && (
-                <Button variant="secondary" disabled={fixing} onClick={() => void fixFirewall()}>
-                  <ShieldCheck className="h-4 w-4" />
-                  {fixing ? "Waiting for Windows…" : "Allow in firewall"}
-                </Button>
-              )}
-              {fixError && <p className="text-xs text-danger">{fixError}</p>}
-            </div>
-          </div>
+    <div className="flex justify-center" style={{ padding: "8px 28px 34px" }}>
+      <div
+        ref={islandRef}
+        className={cn(
+          "island bg-island text-fg shadow-island",
+          view === "pill"
+            ? "w-[280px] rounded-full"
+            : "w-[540px] rounded-[34px] px-5 pt-[18px] pb-5",
         )}
-
-        <section>
-          <SectionTitle>Play from</SectionTitle>
-          <SourcePicker
-            kind={settings.sourceKind}
-            onKind={(k) => void persist({ ...settings, sourceKind: k })}
-            apps={apps}
-            selectedExe={settings.lastAppExe}
-            onSelectApp={(a) => void persist({ ...settings, lastAppExe: a.exe })}
-            onRefresh={() => void refreshApps()}
-            appCaptureSupported={info?.appCaptureSupported ?? false}
-            locked={active}
+      >
+        {view === "pill" && (
+          <Pill
+            status={status}
+            speakers={speakers}
+            level={shownLevel}
+            onExpand={() => setView("panel")}
           />
-          {info && !info.captureSupported && (
-            <p className="mt-2 px-1 text-xs text-warn">
-              Audio capture is only available on Windows. Use the test tone build for protocol
-              tests.
-            </p>
-          )}
-        </section>
-
-        <section>
-          <SectionTitle>Speakers</SectionTitle>
-          {loaded && (
-            <SpeakerList
-              speakers={speakers}
-              selected={active ? status.speakerIds : selected}
-              onToggle={toggleSpeaker}
-              locked={active}
-              connectedIds={status.state.kind === "streaming" ? status.speakerIds : []}
-            />
-          )}
-        </section>
-      </main>
-
-      <footer className="space-y-3 border-t border-border bg-surface px-5 py-4">
-        <div className="flex items-center gap-3">
-          <VolumeIcon className="h-4 w-4 shrink-0 text-muted" />
-          <Slider value={volume} onChange={onVolume} label="Speaker volume" />
-          <span className="w-8 text-right text-xs text-muted tabular-nums">{volume}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {(status.state.kind === "streaming" || status.state.kind === "paused") && (
-            <Button
-              aria-label={status.state.kind === "paused" ? "Resume" : "Pause"}
-              onClick={async () => {
-                const a = await api();
-                if (status.state.kind === "paused") await a.resume();
-                else await a.pause();
-              }}
-            >
-              {status.state.kind === "paused" ? (
-                <Play className="h-4 w-4" />
-              ) : (
-                <Pause className="h-4 w-4" />
-              )}
-            </Button>
-          )}
-          <Button
-            variant={active ? "danger" : "primary"}
-            className="h-10 flex-1"
-            disabled={!active && !canConnect}
-            onClick={() => void primary()}
-          >
-            <Power className="h-4 w-4" /> {primaryLabel}
-          </Button>
-          {status.state.kind === "streaming" && <LevelMeter level={shownLevel} />}
-        </div>
-      </footer>
-
-      {showSettings && (
-        <SettingsPanel
-          settings={settings}
-          onChange={async (s) => {
-            await persist(s);
-            if (s.autoReconnect !== settings.autoReconnect)
-              await (await api()).setAutoReconnect(s.autoReconnect);
-          }}
-          status={status}
-          info={info}
-          onClose={() => setShowSettings(false)}
-          onOpenLogs={async () => (await api()).openLogDir()}
-        />
-      )}
+        )}
+        {view === "panel" && (
+          <Panel
+            info={info}
+            status={status}
+            speakers={speakers}
+            selected={selected}
+            onToggleSpeaker={toggleSpeaker}
+            settings={settings}
+            apps={apps}
+            onPickSystem={() => void persist({ ...settings, sourceKind: "system" })}
+            onPickApp={(a) => void persist({ ...settings, sourceKind: "app", lastAppExe: a.exe })}
+            onRefreshApps={() => void refreshApps()}
+            volume={volume}
+            onVolume={onVolume}
+            level={shownLevel}
+            primaryLabel={primaryLabel}
+            canConnect={canConnect}
+            onPrimary={() => void primary()}
+            onPauseResume={async () => {
+              const a = await api();
+              if (status.state.kind === "paused") await a.resume();
+              else await a.pause();
+            }}
+            onCollapse={() => setView("pill")}
+            onOpenSettings={() => setView("settings")}
+            fixing={fixing}
+            fixError={fixError}
+            onFixFirewall={() => void fixFirewall()}
+          />
+        )}
+        {view === "settings" && (
+          <SettingsView
+            info={info}
+            status={status}
+            settings={settings}
+            onChange={async (s) => {
+              await persist(s);
+              if (s.autoReconnect !== settings.autoReconnect) {
+                await (await api()).setAutoReconnect(s.autoReconnect);
+              }
+            }}
+            onBack={() => setView("panel")}
+            onOpenLogs={async () => (await api()).openLogDir()}
+            onQuit={async () => (await api()).quit()}
+          />
+        )}
+      </div>
     </div>
   );
 }
