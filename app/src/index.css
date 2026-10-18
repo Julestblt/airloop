@@ -1,43 +1,31 @@
 @import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
-/* Design tokens. Dark is the default; light follows the OS setting. */
+/* The island is always black, like the hardware it is inspired by, so there
+   is a single dark palette. The window around it is transparent. */
 @theme {
-  --color-bg: #0e0f13;
-  --color-surface: #16181e;
-  --color-surface-2: #1d2028;
-  --color-border: #2a2e38;
-  --color-fg: #eef0f5;
-  --color-muted: #9097a6;
-  --color-accent: #5b8cff;
-  --color-accent-fg: #ffffff;
-  --color-ok: #3ccf91;
-  --color-warn: #f0b44c;
+  --color-island: #000000;
+  --color-raised: #1c1c1e;
+  --color-raised-hover: #2a2a2e;
+  --color-line: #3a3a3c;
+  --color-fg: #f5f5f7;
+  --color-muted: #9a9aa0;
+  --color-accent: #5cf0a0;
   --color-danger: #ff6b6b;
-  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --radius-card: 14px;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --color-bg: #f4f5f8;
-    --color-surface: #ffffff;
-    --color-surface-2: #eef0f4;
-    --color-border: #dfe2e9;
-    --color-fg: #14161c;
-    --color-muted: #646b7a;
-    --color-accent: #3d6fe6;
-  }
+  --font-sans: "Geist Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --shadow-island: 0 10px 26px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.35);
 }
 
 html,
 body,
 #root {
-  height: 100%;
+  margin: 0;
+  background: transparent;
 }
 
 body {
-  margin: 0;
-  background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -46,36 +34,42 @@ body {
   overflow: hidden;
 }
 
-/* Range input styled as a volume slider. */
-input[type="range"].slider {
+/* The island morphs between pill and panel. */
+.island {
+  transition:
+    width 0.32s cubic-bezier(0.2, 0.9, 0.2, 1),
+    border-radius 0.32s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+input[type="range"].vol {
   appearance: none;
-  height: 4px;
+  height: 6px;
   border-radius: 999px;
   background: linear-gradient(
     to right,
-    var(--color-accent) var(--fill, 0%),
-    var(--color-border) var(--fill, 0%)
+    var(--color-fg) var(--fill, 0%),
+    var(--color-line) var(--fill, 0%)
   );
   outline: none;
 }
-input[type="range"].slider::-webkit-slider-thumb {
+input[type="range"].vol::-webkit-slider-thumb {
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
-  background: var(--color-fg);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.5);
   cursor: pointer;
 }
-input[type="range"].slider:focus-visible::-webkit-slider-thumb {
+input[type="range"].vol:focus-visible::-webkit-slider-thumb {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: var(--color-line);
   border-radius: 999px;
 }

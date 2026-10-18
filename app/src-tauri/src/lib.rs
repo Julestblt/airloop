@@ -166,6 +166,11 @@ async fn fix_firewall() -> CmdResult<()> {
 }
 
 #[tauri::command]
+fn quit_app(app: AppHandle) {
+    quit(&app);
+}
+
+#[tauri::command]
 fn get_level(state: State<'_, AppState>) -> f32 {
     state.engine.take_level()
 }
@@ -213,11 +218,18 @@ fn init_logging(log_dir: &PathBuf) -> Option<tracing_appender::non_blocking::Wor
     guard
 }
 
+/// Shows the island and asks the UI to open its panel.
 fn show_main(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
-        let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
+    }
+    let _ = app.emit("island:expand", ());
+}
+
+fn hide_main(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.hide();
     }
 }
 
@@ -286,9 +298,10 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         true,
         None::<&str>,
     )?;
+    let hide = MenuItem::with_id(app, "hide", "Hide island", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&show, &toggle, &sep, &quit_item])?;
+    let menu = Menu::with_items(app, &[&show, &toggle, &hide, &sep, &quit_item])?;
     let tray = TrayIconBuilder::with_id("main")
         .icon(
             app.default_window_icon()
@@ -300,6 +313,7 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main(app),
+            "hide" => hide_main(app),
             "toggle" => tray_toggle(app),
             "quit" => quit(app),
             _ => {}
@@ -389,16 +403,10 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            // The island has no close button; Alt+F4 hides it to the tray.
             if let WindowEvent::CloseRequested { api, .. } = event {
-                let app = window.app_handle();
-                let to_tray = app.state::<AppState>().settings.get().close_to_tray;
-                if to_tray {
-                    api.prevent_close();
-                    let _ = window.hide();
-                } else {
-                    api.prevent_close();
-                    quit(app);
-                }
+                api.prevent_close();
+                let _ = window.hide();
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -417,6 +425,7 @@ pub fn run() {
             get_level,
             open_log_dir,
             fix_firewall,
+            quit_app,
         ]);
 
     if let Err(e) = builder.run(tauri::generate_context!()) {

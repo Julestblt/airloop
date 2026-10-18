@@ -46,15 +46,26 @@ A portable `.zip` (no installer, no firewall rule) is also published.
 
 ## Using it
 
+Airloop lives in a black **island** at the top of the screen, inspired by the
+iPhone's Dynamic Island:
+
+- **Pill** (collapsed): shows the speaker and live level bars while playing.
+  Click it to open the panel. Clicking anywhere else folds it back.
+- **Panel** (expanded): choose **Whole PC** or an app, pick one or more
+  speakers (a Home-app stereo pair is one entry), set the volume, press
+  **Play**. While playing: **Pause** / **Disconnect**.
+- The tray icon reopens the island, reconnects to the last speakers, hides the
+  island or quits.
+
+Notes:
+
 - **Volume** is the speaker's own volume (AirPlay volume), independent of the
-  Windows volume. It starts at a quiet 25 % for a new install and remembers the
-  last value.
+  Windows volume. It starts at a quiet 25 % and remembers the last value.
 - **Your PC's speakers keep playing** while capturing the whole PC; mute them
   or pick an output with nothing attached if you only want the HomePod.
 - Expect about **2 seconds of delay**: AirPlay buffers audio on the speaker.
   Fine for music and podcasts, not for games or video calls.
-- Closing the window keeps Airloop in the tray (configurable). Right-click the
-  tray icon to reconnect to the last speakers or to quit.
+- Device icons: [MingCute](https://github.com/Richard9394/MingCute) (Apache-2.0).
 
 ## Documentation
 
