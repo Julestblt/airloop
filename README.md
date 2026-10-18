@@ -18,8 +18,8 @@ choose **Whole PC** or **One app**, press **Connect**.
 | HomePod mini stereo pair shown as one speaker | ✅ Verified (audioOS 27.0) |
 | Streaming to a HomePod mini stereo pair | ✅ Verified audible, 90 s session without dropouts (test tone, from Linux) |
 | Volume control | ✅ Verified (AirPlay −30…0 dB scale) |
-| Whole-PC capture (WASAPI loopback) | ⚠️ Implemented, compiles and is unit-tested; **not yet run on real Windows hardware** |
-| One-app capture (process loopback) | ⚠️ Implemented (Windows 11 / Win10 build 20348+); **not yet run on real hardware** |
+| Whole-PC capture (WASAPI loopback) | ⚠️ Implemented; same pipeline as app capture, not yet confirmed by a user |
+| One-app capture (process loopback) | ✅ Confirmed on a real Windows PC (Brave → HomePod mini pair, 0.1.2) |
 | Several speakers at once | ⚠️ Implemented (shared NTP clock + SETPEERS); not verified — no independent speakers were available |
 | Single unpaired HomePod, Apple TV, third-party AirPlay 2 | ❓ Expected to work, untested |
 | Browser-tab capture | ❌ Not possible without a browser extension; capture the browser app instead |

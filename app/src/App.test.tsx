@@ -34,6 +34,7 @@ const settings: Settings = {
   lastAppExe: null,
   volume: 25,
   autoReconnect: true,
+  lowLatency: false,
   closeToTray: true,
 };
 

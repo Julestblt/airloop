@@ -152,6 +152,12 @@ async fn resume(state: State<'_, AppState>) -> CmdResult<()> {
 }
 
 #[tauri::command]
+async fn set_low_latency(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
+    state.engine.set_low_latency(enabled).await;
+    Ok(())
+}
+
+#[tauri::command]
 async fn set_auto_reconnect(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
     state.engine.set_auto_reconnect(enabled).await;
     Ok(())
@@ -402,7 +408,7 @@ pub fn run() {
             let config_dir = handle.path().app_config_dir()?;
             let settings = SettingsStore::load(config_dir.join("settings.json"));
             let s = settings.get();
-            let engine = tauri::async_runtime::block_on(Engine::start(s.volume, s.auto_reconnect))
+            let engine = tauri::async_runtime::block_on(Engine::start(s.volume, s.auto_reconnect, s.low_latency))
                 .map_err(|e| {
                     error!(error = %e, "engine failed to start");
                     Box::<dyn std::error::Error>::from(e.to_string())
@@ -434,6 +440,7 @@ pub fn run() {
             pause,
             resume,
             set_auto_reconnect,
+            set_low_latency,
             get_level,
             open_log_dir,
             fix_firewall,
